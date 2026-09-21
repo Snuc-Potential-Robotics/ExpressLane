@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Emotion Drive — Robot Controller</title>
+  <meta name="description" content="Minimal web controller for the face-emotion driven robot.">
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app">
+    <!-- Top bar -->
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-dot" aria-hidden="true"></span>
+        <div class="brand-text">
+          <h1>Emotion Drive</h1>
+          <p>Face-controlled robot</p>
+        </div>
+      </div>
+
+      <div class="status-chips" role="status" aria-label="Connection status">
+        <div class="chip"><span class="chip-label">Mode</span><span class="chip-value" id="modeVal">AI Auto</span></div>
+        <div class="chip hide-sm"><span class="chip-label">Robot</span><span class="chip-value mono" id="targetVal">192.168.4.1:4210</span></div>
+        <div class="chip"><span class="chip-label">FPS</span><span class="chip-value mono" id="fpsVal">0.0</span></div>
+        <div class="chip hide-sm"><span class="chip-label">Latency</span><span class="chip-value mono" id="latencyVal">0 ms</span></div>
+      </div>
+
+      <div class="topbar-actions">
+        <button id="emergencyStopBtn" class="btn btn-danger">
+          <span aria-hidden="true">■</span> Stop
+          <kbd>Space</kbd>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main grid -->
+    <main class="layout">
+      <!-- Vision -->
+      <section class="card" aria-labelledby="vision-title">
+        <div class="card-head">
+          <div>
+            <h2 id="vision-title">Camera</h2>
+            <p class="card-sub">Live face tracking and emotion confidence</p>
+          </div>
+          <span class="badge" id="faceDetectTag">No face</span>
+        </div>
+
+        <div class="video-frame">
+          <img id="videoStream" src="/video_feed" alt="Live camera feed with face overlay">
+        </div>
+
+        <div class="panel">
+          <h3 class="panel-title">Emotion confidence</h3>
+          <div class="gauges" id="gaugesList">
+            <div class="gauge-row" data-emotion="Happy">
+              <span class="emo-label">Happy</span>
+              <div class="bar-track"><div class="bar-fill bar-happy" style="width: 0%"></div></div>
+              <span class="emo-pct mono">0%</span>
+            </div>
+            <div class="gauge-row" data-emotion="Sad">
+              <span class="emo-label">Sad</span>
+              <div class="bar-track"><div class="bar-fill bar-sad" style="width: 0%"></div></div>
+              <span class="emo-pct mono">0%</span>
+            </div>
+            <div class="gauge-row" data-emotion="Angry">
+              <span class="emo-label">Angry</span>
+              <div class="bar-track"><div class="bar-fill bar-angry" style="width: 0%"></div></div>
+              <span class="emo-pct mono">0%</span>
+            </div>
+            <div class="gauge-row" data-emotion="Surprised">
+              <span class="emo-label">Surprised</span>
+              <div class="bar-track"><div class="bar-fill bar-surprised" style="width: 0%"></div></div>
+              <span class="emo-pct mono">0%</span>
+            </div>
+            <div class="gauge-row" data-emotion="Neutral">
+              <span class="emo-label">Neutral</span>
+              <div class="bar-track"><div class="bar-fill bar-neutral" style="width: 0%"></div></div>
+              <span class="emo-pct mono">0%</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Motion -->
+      <section class="card" aria-labelledby="motion-title">
+        <div class="card-head">
+          <div>
+            <h2 id="motion-title">Motion</h2>
+            <p class="card-sub">Current command and virtual preview</p>
+          </div>
+          <span class="badge badge-active" id="activeActionTag">STOP</span>
+        </div>
+
+        <div class="motion-grid" role="group" aria-label="Current motion">
+          <div class="motion-btn" id="arrowForward"><span class="motion-dir">Forward</span><span class="motion-hint">Happy</span></div>
+          <div class="motion-btn" id="arrowLeft"><span class="motion-dir">Left</span><span class="motion-hint">Angry</span></div>
+          <div class="motion-btn motion-center" id="coreStop"><span class="motion-dir">Stop</span></div>
+          <div class="motion-btn" id="arrowRight"><span class="motion-dir">Right</span><span class="motion-hint">Surprised</span></div>
+          <div class="motion-btn" id="arrowBackward"><span class="motion-dir">Back</span><span class="motion-hint">Sad</span></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h3 class="panel-title">Virtual arena</h3>
+            <button id="resetArenaBtn" class="btn btn-ghost btn-sm">Reset</button>
+          </div>
+          <div class="arena-wrap">
+            <canvas id="arenaCanvas" width="640" height="360"></canvas>
+          </div>
+          <p class="hint">Preview mirrors the live emotion command.</p>
+        </div>
+
+        <div class="stat-row">
+          <div class="stat">
+            <span class="stat-label">Sent</span>
+            <span class="stat-value mono" id="statPackets">0</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Speed</span>
+            <span class="stat-value mono" id="statSpeed">200</span>
+          </div>
+          <div class="stat">
+            <span class="stat-label">Command</span>
+            <span class="stat-value mono" id="statCmd">S</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Controls -->
+      <section class="card" aria-labelledby="controls-title">
+        <div class="card-head">
+          <div>
+            <h2 id="controls-title">Controls</h2>
+            <p class="card-sub">Drive mode, tuning and robot link</p>
+          </div>
+        </div>
+
+        <div class="segmented" role="tablist" aria-label="Drive mode">
+          <button id="btnModeAI" class="segmented-btn active">Auto</button>
+          <button id="btnModeManual" class="segmented-btn">Manual</button>
+        </div>
+        <p class="hint" id="modePill">Auto follows your facial expression. Manual uses keys or pad.</p>
+
+        <div class="dpad-wrap" id="dpadSection">
+          <div class="dpad">
+            <span></span>
+            <button class="dpad-btn" id="dpadUp" aria-label="Forward">↑</button>
+            <span></span>
+            <button class="dpad-btn" id="dpadLeft" aria-label="Left">←</button>
+            <button class="dpad-btn dpad-stop" id="dpadStop" aria-label="Stop">■</button>
+            <button class="dpad-btn" id="dpadRight" aria-label="Right">→</button>
+            <span></span>
+            <button class="dpad-btn" id="dpadDown" aria-label="Backward">↓</button>
+            <span></span>
+          </div>
+          <p class="hint"><strong>W A S D</strong> or arrow keys drive in Manual mode.</p>
+        </div>
+
+        <div class="panel">
+          <h3 class="panel-title">Tuning</h3>
+          <div class="field">
+            <div class="field-row">
+              <label for="speedSlider">Motor speed</label>
+              <span class="field-value mono" id="speedDisplay">200</span>
+            </div>
+            <input type="range" id="speedSlider" min="100" max="255" value="200">
+          </div>
+          <div class="field">
+            <div class="field-row">
+              <label for="turnSpeedSlider">Turn speed (L / R)</label>
+              <span class="field-value mono" id="turnSpeedDisplay">130</span>
+            </div>
+            <input type="range" id="turnSpeedSlider" min="70" max="200" value="130">
+          </div>
+          <div class="field">
+            <div class="field-row">
+              <label for="threshSlider">Emotion threshold</label>
+              <span class="field-value mono" id="threshDisplay">55%</span>
+            </div>
+            <input type="range" id="threshSlider" min="30" max="85" value="55">
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3 class="panel-title">Emotion mapping</h3>
+          <div class="map-grid">
+            <div class="map-row">
+              <label for="mapHappy">Happy</label>
+              <select id="mapHappy">
+                <option value="FORWARD" selected>Forward</option>
+                <option value="BACKWARD">Backward</option>
+                <option value="LEFT">Left</option>
+                <option value="RIGHT">Right</option>
+                <option value="STOP">Stop</option>
+              </select>
+            </div>
+            <div class="map-row">
+              <label for="mapSad">Sad</label>
+              <select id="mapSad">
+                <option value="FORWARD">Forward</option>
+                <option value="BACKWARD" selected>Backward</option>
+                <option value="LEFT">Left</option>
+                <option value="RIGHT">Right</option>
+                <option value="STOP">Stop</option>
+              </select>
+            </div>
+            <div class="map-row">
+              <label for="mapAngry">Angry</label>
+              <select id="mapAngry">
+                <option value="FORWARD">Forward</option>
+                <option value="BACKWARD">Backward</option>
+                <option value="LEFT" selected>Left</option>
+                <option value="RIGHT">Right</option>
+                <option value="STOP">Stop</option>
+              </select>
+            </div>
+            <div class="map-row">
+              <label for="mapSurprised">Surprised</label>
+              <select id="mapSurprised">
+                <option value="FORWARD">Forward</option>
+                <option value="BACKWARD">Backward</option>
+                <option value="LEFT">Left</option>
+                <option value="RIGHT" selected>Right</option>
+                <option value="STOP">Stop</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3 class="panel-title">Robot connection</h3>
+          <div class="net-row">
+            <input type="text" id="targetIpInput" value="192.168.4.1" placeholder="192.168.4.1" inputmode="decimal" aria-label="Robot IP address">
+            <input type="number" id="targetPortInput" value="4210" placeholder="4210" aria-label="Robot port">
+          </div>
+          <button id="btnSaveNetwork" class="btn btn-primary btn-block">Update connection</button>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>Press <kbd>Space</kbd> for emergency stop. Neutral or no face always stops.</p>
+    </footer>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
